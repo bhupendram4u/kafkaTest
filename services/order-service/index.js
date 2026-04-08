@@ -1,10 +1,12 @@
-const express = require('express');
-const { Pool } = require('pg');
-const { producer, createConsumer, connectProducer } = require('./shared/kafkaClient');
-const consumer = createConsumer('order-service-group');
-const logger = require('./shared/logger')('order-service');
-const RetryHandler = require('./shared/retryHandler');
+import express from 'express';
+import pg from 'pg';
+import { producer, createConsumer, connectProducer } from './shared/kafkaClient/index.js';
+import logger from './shared/logger/index.js';
+import RetryHandler from './shared/retryHandler/index.js';
 
+const { Pool } = pg;
+const consumer = createConsumer('order-service-group');
+const orderLogger = logger('order-service');
 const app = express();
 app.use(express.json());
 
@@ -41,7 +43,7 @@ app.post('/orders', async (req, res) => {
     );
 
     if (result.rowCount === 0) {
-      logger.info({
+      orderLogger.info({
         orderId,
         event: 'order_created',
         status: 'SKIPPED',
@@ -56,7 +58,7 @@ app.post('/orders', async (req, res) => {
       [TOPICS.ORDER_CREATED, JSON.stringify({ orderId, amount })]
     );
 
-    logger.info({
+    orderLogger.info({
       orderId,
       event: 'order_created',
       status: 'STARTED',
@@ -65,7 +67,7 @@ app.post('/orders', async (req, res) => {
 
     res.status(201).json({ message: 'Order created', orderId });
   } catch (error) {
-    logger.error({
+    orderLogger.error({
       orderId,
       event: 'order_created',
       status: 'FAILED',
@@ -95,7 +97,7 @@ async function processOutbox() {
         ['processed', event.id]
       );
 
-      logger.info({
+      orderLogger.info({
         orderId: event.payload.orderId,
         event: event.event_type,
         status: 'PUBLISHED',
@@ -103,7 +105,7 @@ async function processOutbox() {
       });
     }
   } catch (error) {
-    logger.error({
+    orderLogger.error({
       event: 'outbox_processing',
       status: 'FAILED',
       reason: error.message
@@ -155,7 +157,7 @@ async function start() {
   await consumer.subscribe({ topic: TOPICS.INVENTORY_FAILED });
 
   app.listen(3001, () => {
-    logger.info({ message: 'Order Service started on port 3001' });
+    orderLogger.info({ message: 'Order Service started on port 3001' });
   });
 
   // Start outbox worker
@@ -164,6 +166,7 @@ async function start() {
   // Run consumer without blocking the rest of the startup flow
   consumer.run({
     eachMessage: async ({ topic, message }) => {
+      console.log(`##### Received message on topic ${topic}: ${message.value.toString()}`);
       const event = JSON.parse(message.value.toString());
       event.event = topic;
       const operation = () => {
@@ -179,10 +182,10 @@ async function start() {
         }
       };
 
-      await retryHandler.executeWithRetry(operation, event, logger);
+      await retryHandler.executeWithRetry(operation, event, orderLogger);
     }
   }).catch((error) => {
-    logger.error({
+    orderLogger.error({
       event: 'consumer_start',
       status: 'FAILED',
       reason: error.message

@@ -1,4 +1,4 @@
-const { Kafka } = require('kafkajs');
+import { Kafka } from 'kafkajs';
 
 const kafka = new Kafka({
   clientId: 'ecommerce-microservices',
@@ -17,7 +17,7 @@ const disconnectProducer = async () => {
   await producer.disconnect();
 };
 
-module.exports = {
+export {
   kafka,
   producer,
   createConsumer,

@@ -1,4 +1,4 @@
-const { producer } = require('../kafkaClient');
+import { producer } from '../kafkaClient/index.js';
 
 class RetryHandler {
   constructor(maxRetries = 3, deadLetterTopic = 'dead_letter') {
@@ -59,4 +59,4 @@ class RetryHandler {
   }
 }
 
-module.exports = RetryHandler;
+export default RetryHandler;

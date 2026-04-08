@@ -2,6 +2,7 @@
   "name": "inventory-service",
   "version": "1.0.0",
   "description": "Inventory Service for E-commerce Microservices",
+  "type": "module",
   "main": "index.js",
   "scripts": {
     "start": "node index.js",

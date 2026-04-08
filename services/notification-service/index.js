@@ -1,8 +1,9 @@
-const { createConsumer, connectProducer } = require('./shared/kafkaClient');
-const consumer = createConsumer('notification-service-group');
-const logger = require('./shared/logger')('notification-service');
-const RetryHandler = require('./shared/retryHandler');
+import { createConsumer, connectProducer } from './shared/kafkaClient/index.js';
+import logger from './shared/logger/index.js';
+import RetryHandler from './shared/retryHandler/index.js';
 
+const consumer = createConsumer('notification-service-group');
+const notificationLogger = logger('notification-service');
 const retryHandler = new RetryHandler();
 
 const TOPICS = {
@@ -14,7 +15,7 @@ async function sendNotification(event, type) {
   const { orderId } = event;
 
   // Simulate sending email
-  logger.info({
+  notificationLogger.info({
     orderId,
     event: type === 'confirmed' ? 'order_confirmed' : 'order_cancelled',
     status: 'SUCCESS',
@@ -33,11 +34,11 @@ async function start() {
     eachMessage: async ({ topic, message }) => {
       const event = JSON.parse(message.value.toString());
       const type = topic === TOPICS.ORDER_CONFIRMED ? 'confirmed' : 'cancelled';
-      await retryHandler.executeWithRetry(() => sendNotification(event, type), { ...event, event: topic }, logger);
+      await retryHandler.executeWithRetry(() => sendNotification(event, type), { ...event, event: topic }, notificationLogger);
     }
   });
 
-  logger.info({ message: 'Notification Service started' });
+  notificationLogger.info({ message: 'Notification Service started' });
 }
 
 start().catch(console.error);

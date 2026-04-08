@@ -1,8 +1,9 @@
-const { producer, createConsumer, connectProducer } = require('./shared/kafkaClient');
-const consumer = createConsumer('inventory-service-group');
-const logger = require('./shared/logger')('inventory-service');
-const RetryHandler = require('./shared/retryHandler');
+import { producer, createConsumer, connectProducer } from './shared/kafkaClient/index.js';
+import logger from './shared/logger/index.js';
+import RetryHandler from './shared/retryHandler/index.js';
 
+const consumer = createConsumer('inventory-service-group');
+const inventoryLogger = logger('inventory-service');
 const retryHandler = new RetryHandler();
 
 const TOPICS = {
@@ -14,7 +15,7 @@ const TOPICS = {
 async function processInventory(event) {
   const { orderId, amount } = event;
 
-  logger.info({
+  inventoryLogger.info({
     orderId,
     event: 'inventory_reserved',
     status: 'STARTED',
@@ -50,11 +51,11 @@ async function start() {
     eachMessage: async ({ message }) => {
       const event = JSON.parse(message.value.toString());
       event.event = TOPICS.PAYMENT_SUCCESS;
-      await retryHandler.executeWithRetry(() => processInventory(event), event, logger);
+      await retryHandler.executeWithRetry(() => processInventory(event), event, inventoryLogger);
     }
   });
 
-  logger.info({ message: 'Inventory Service started' });
+  inventoryLogger.info({ message: 'Inventory Service started' });
 }
 
 start().catch(console.error);

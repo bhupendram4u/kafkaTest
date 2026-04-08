@@ -1,9 +1,10 @@
-const { producer, createConsumer, connectProducer } = require('./shared/kafkaClient');
-const consumer = createConsumer('payment-service-group');
-const logger = require('./shared/logger')('payment-service');
-const RetryHandler = require('./shared/retryHandler');
-const redis = require('redis');
+import { producer, createConsumer, connectProducer } from './shared/kafkaClient/index.js';
+import logger from './shared/logger/index.js';
+import RetryHandler from './shared/retryHandler/index.js';
+import redis from 'redis';
 
+const consumer = createConsumer('payment-service-group');
+const paymentLogger = logger('payment-service');
 const client = redis.createClient({
   socket: {
     host: process.env.REDIS_HOST || 'localhost',
@@ -25,7 +26,7 @@ async function processPayment(event) {
   // Idempotency check
   const exists = await client.get(`payment:${orderId}`);
   if (exists) {
-    logger.info({
+    paymentLogger.info({
       orderId,
       event: 'payment_processing',
       status: 'SKIPPED',
@@ -35,7 +36,7 @@ async function processPayment(event) {
   }
 
   // Simulate payment processing
-  logger.info({
+  paymentLogger.info({
     orderId,
     event: 'payment_processing',
     status: 'STARTED',
@@ -77,11 +78,11 @@ async function start() {
     eachMessage: async ({ message }) => {
       const event = JSON.parse(message.value.toString());
       event.event = TOPICS.ORDER_CREATED;
-      await retryHandler.executeWithRetry(() => processPayment(event), event, logger);
+      await retryHandler.executeWithRetry(() => processPayment(event), event, paymentLogger);
     }
   });
 
-  logger.info({ message: 'Payment Service started' });
+  paymentLogger.info({ message: 'Payment Service started' });
 }
 
 start().catch(console.error);
